@@ -1,0 +1,93 @@
+name: PebbleHost Sync (SFTP -> GitHub)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pebblehost-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Pull files from PebbleHost via SFTP
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_PORT: ${{ secrets.SFTP_PORT }}
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_PASS: ${{ secrets.SFTP_PASS }}
+          SFTP_ROOT: ${{ secrets.SFTP_ROOT }}
+        run: |
+          set -euo pipefail
+          : "${SFTP_HOST:?Missing SFTP_HOST secret}"
+          : "${SFTP_PORT:?Missing SFTP_PORT secret}"
+          : "${SFTP_USER:?Missing SFTP_USER secret}"
+          : "${SFTP_PASS:?Missing SFTP_PASS secret}"
+          : "${SFTP_ROOT:?Missing SFTP_ROOT secret}"
+
+          mkdir -p server_snapshot
+
+          lftp -u "${SFTP_USER}","${SFTP_PASS}" -p "${SFTP_PORT}" "sftp://${SFTP_HOST}" -e "\
+            set sftp:auto-confirm yes; \
+            set net:max-retries 2; \
+            set net:timeout 20; \
+            set xfer:clobber on; \
+            mirror --verbose --delete --only-newer --parallel=2 \
+              --exclude-glob .git/ \
+              --exclude-glob .env \
+              --exclude-glob *.env \
+              --exclude-glob .trash/ \
+              --exclude-glob logs/ \
+              --exclude-glob crash-reports/ \
+              --exclude-glob cache/ \
+              --exclude-glob world/ \
+              --exclude-glob world_nether/ \
+              --exclude-glob world_the_end/ \
+              --exclude-glob plugins/*/data/ \
+              --exclude-glob plugins/*/database/ \
+              --exclude-glob plugins/*/cache/ \
+              \"${SFTP_ROOT}\" server_snapshot; \
+            bye"
+
+          rsync -a --delete \
+            --exclude ".git/" \
+            --exclude ".github/" \
+            server_snapshot/ ./
+
+      - name: Commit & push if changed
+        env:
+          BRANCH: ${{ secrets.GIT_BRANCH }}
+        run: |
+          set -euo pipefail
+          git config user.name "pebblehost-sync"
+          git config user.email "pebblehost-sync@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes."
+            exit 0
+          fi
+
+          TS="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          git commit -m "PebbleHost sync ${TS}"
+
+          if [ -n "${BRANCH:-}" ]; then
+            git push origin "HEAD:${BRANCH}"
+          else
+            git push
+          fi
