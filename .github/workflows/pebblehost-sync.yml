@@ -3,7 +3,6 @@ name: PebbleHost Sync (SFTP -> GitHub)
 on:
   workflow_dispatch:
   schedule:
-    # every 6 hours
     - cron: "0 */6 * * *"
 
 permissions:
@@ -42,31 +41,27 @@ jobs:
 
           mkdir -p server_snapshot
 
-          lftp -u "${SFTP_USER}","${SFTP_PASS}" -p "${SFTP_PORT}" "sftp://${SFTP_HOST}" <<LFTP
-          set sftp:auto-confirm yes
-          set net:max-retries 2
-          set net:timeout 20
-          set xfer:clobber on
-          mirror --verbose \
-                 --delete \
-                 --only-newer \
-                 --parallel=2 \
-                 --exclude-glob .git/ \
-                 --exclude-glob .env \
-                 --exclude-glob *.env \
-                 --exclude-glob .trash/ \
-                 --exclude-glob logs/ \
-                 --exclude-glob crash-reports/ \
-                 --exclude-glob cache/ \
-                 --exclude-glob world/ \
-                 --exclude-glob world_nether/ \
-                 --exclude-glob world_the_end/ \
-                 --exclude-glob plugins/*/data/ \
-                 --exclude-glob plugins/*/database/ \
-                 --exclude-glob plugins/*/cache/ \
-                 "${SFTP_ROOT}" server_snapshot
-          bye
-LFTP
+          lftp -u "${SFTP_USER}","${SFTP_PASS}" -p "${SFTP_PORT}" "sftp://${SFTP_HOST}" -e "\
+            set sftp:auto-confirm yes; \
+            set net:max-retries 2; \
+            set net:timeout 20; \
+            set xfer:clobber on; \
+            mirror --verbose --delete --only-newer --parallel=2 \
+              --exclude-glob .git/ \
+              --exclude-glob .env \
+              --exclude-glob *.env \
+              --exclude-glob .trash/ \
+              --exclude-glob logs/ \
+              --exclude-glob crash-reports/ \
+              --exclude-glob cache/ \
+              --exclude-glob world/ \
+              --exclude-glob world_nether/ \
+              --exclude-glob world_the_end/ \
+              --exclude-glob plugins/*/data/ \
+              --exclude-glob plugins/*/database/ \
+              --exclude-glob plugins/*/cache/ \
+              \"${SFTP_ROOT}\" server_snapshot; \
+            bye"
 
           rsync -a --delete \
             --exclude ".git/" \
