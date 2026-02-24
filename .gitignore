@@ -1,0 +1,35 @@
+# =========================
+# ENV FILES (Secrets)
+# =========================
+.env
+*.env
+!.env.sample
+
+# =========================
+# Runtime Trash / Temp
+# =========================
+.trash
+.trash/
+cache/
+logs/
+crash-reports/
+
+# =========================
+# Minecraft World Data (excluded from repo mirror)
+# =========================
+world/
+world_nether/
+world_the_end/
+
+# =========================
+# Plugin Data Dumps (keep configs, drop heavy runtime data)
+# =========================
+plugins/*/data/
+plugins/*/database/
+plugins/*/cache/
+
+# =========================
+# Misc System Files
+# =========================
+.DS_Store
+Thumbs.db
