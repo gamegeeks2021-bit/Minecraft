@@ -33,35 +33,28 @@ jobs:
           SFTP_ROOT: ${{ secrets.SFTP_ROOT }}
         run: |
           set -euo pipefail
-          : "${SFTP_HOST:?Missing SFTP_HOST secret}"
-          : "${SFTP_PORT:?Missing SFTP_PORT secret}"
-          : "${SFTP_USER:?Missing SFTP_USER secret}"
-          : "${SFTP_PASS:?Missing SFTP_PASS secret}"
-          : "${SFTP_ROOT:?Missing SFTP_ROOT secret}"
-
           mkdir -p server_snapshot
 
-          lftp -u "${SFTP_USER}","${SFTP_PASS}" "sftp://${SFTP_HOST}:${SFTP_PORT}" -e "\
-            set sftp:auto-confirm yes; \
-            set net:max-retries 2; \
-            set net:timeout 20; \
-            set xfer:clobber on; \
-            mirror --verbose --delete --only-newer --parallel=2 \
-              --exclude-glob .git/ \
-              --exclude-glob .env \
-              --exclude-glob *.env \
-              --exclude-glob .trash/ \
-              --exclude-glob logs/ \
-              --exclude-glob crash-reports/ \
-              --exclude-glob cache/ \
-              --exclude-glob world/ \
-              --exclude-glob world_nether/ \
-              --exclude-glob world_the_end/ \
-              --exclude-glob plugins/*/data/ \
-              --exclude-glob plugins/*/database/ \
-              --exclude-glob plugins/*/cache/ \
-              \"${SFTP_ROOT}\" server_snapshot; \
-            bye"
+          lftp <<EOF
+          set sftp:auto-confirm yes
+          open -u ${SFTP_USER},${SFTP_PASS} sftp://${SFTP_HOST}:${SFTP_PORT}
+          mirror --verbose --delete --only-newer --parallel=2 \
+            --exclude-glob .git/ \
+            --exclude-glob .env \
+            --exclude-glob *.env \
+            --exclude-glob .trash/ \
+            --exclude-glob logs/ \
+            --exclude-glob crash-reports/ \
+            --exclude-glob cache/ \
+            --exclude-glob world/ \
+            --exclude-glob world_nether/ \
+            --exclude-glob world_the_end/ \
+            --exclude-glob plugins/*/data/ \
+            --exclude-glob plugins/*/database/ \
+            --exclude-glob plugins/*/cache/ \
+            ${SFTP_ROOT} server_snapshot
+          bye
+          EOF
 
           rsync -a --delete \
             --exclude ".git/" \
